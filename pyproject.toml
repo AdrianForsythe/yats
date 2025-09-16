@@ -1,0 +1,35 @@
+[project]
+name = "yats"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "defusedxml>=0.7.1",
+    "diff-match-patch>=20241021",
+    "django>=5.0.0,<6.0.0",
+    "django-background-tasks>=1.2.8",
+    "django-haystack>=3.3.0",
+    "django-markdownx>=4.0.9",
+    "djradicale>=0.0.14",
+    "dnspython>=2.8.0",
+    "furl>=2.1.4",
+    "httplib2>=0.31.0",
+    "itsdangerous>=2.2.0",
+    "markdown>=3.9",
+    "monotonic>=1.6",
+    "pillow>=11.3.0",
+    "pyclamd>=0.4.0",
+    "pydevd>=3.3.0",
+    "pydub>=0.25.1",
+    "pygments>=2.19.2",
+    "pymemcache>=4.0.0",
+    "radicale==1.1.1",
+    "rpc4django>=0.6.3",
+    "six>=1.17.0",
+    "speechrecognition>=3.14.3",
+    "vobject>=0.9.9",
+    "wand>=0.6.13",
+    "webservices[django]>=0.7",
+    "xapian-haystack>=3.1.0",
+]

@@ -1,0 +1,64 @@
+# YATS Requirements for local development
+# Based on vagrant/requirements.txt with version updates for Python 3.11
+
+# Core Django
+Django>=5.0.0,<6.0.0
+
+# Text processing and markup
+diff-match-patch
+Markdown
+six
+pillow
+itsdangerous
+defusedxml
+pygments
+
+# Web services and APIs
+webservices[django]
+httplib2
+rpc4django
+
+# Security and virus scanning
+pyclamd
+
+# Network and DNS
+dnspython
+
+# Calendar and vCard support
+vobject
+
+# Background tasks
+django-background-tasks
+
+# Audio processing
+pydub
+
+# Caching
+pymemcache
+
+# Image processing
+Wand
+
+# Monotonic time
+monotonic
+
+# Speech recognition
+SpeechRecognition
+
+# Django extensions
+django-markdownx
+django-haystack
+
+# Search backend
+xapian-haystack
+
+# URL parsing
+furl
+
+# CalDAV support
+djradicale
+Radicale==1.1.1
+
+# Development dependencies
+pydevd
+
