@@ -45,6 +45,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'yats.middleware.auth.OrgaAdditionMiddleware',  # Add this
 ]
 
 ROOT_URLCONF = 'web.urls'
