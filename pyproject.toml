@@ -1,0 +1,189 @@
+[project]
+name = "yats"
+version = "4.0.0"
+description = "Yet Another Trouble Ticketing System"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Media Factory", email = "hg@mediafactory.de"},
+]
+keywords = ["django", "ticketing", "trouble-tracking", "project-management"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Django",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Bug Tracking",
+]
+
+dependencies = [
+    # Core Django
+    "django>=5.0,<6.0",
+    # Text processing and markup
+    "diff-match-patch",
+    "markdown>=3.0",
+    "pillow>=10.0",
+    "pygments>=2.0",
+    # Web services and APIs
+    "webservices[django]",
+    "httplib2",
+    "rpc4django",
+    # Security and utilities
+    "itsdangerous",
+    "defusedxml",
+    "dnspython",
+    # Calendar and vCard support
+    "vobject",
+    # Background tasks
+    "django-background-tasks",
+    # Audio processing
+    "pydub",
+    # Caching
+    "pymemcache",
+    # Image processing
+    "wand",
+    # Monotonic time
+    "monotonic",
+    # Speech recognition
+    "speechrecognition",
+    # Django extensions
+    "django-markdownx",
+    # URL parsing
+    "furl",
+    # Legacy support
+    "six",
+    "haystack>=0.42",
+    "django-haystack>=3.3.0",
+]
+
+[project.optional-dependencies]
+# Full production dependencies (including search and CalDAV)
+full = [
+    "django-haystack",
+    "xapian-haystack",
+    "djradicale",
+    "radicale==1.1.1",
+    "pyclamd",
+]
+
+# Development dependencies
+dev = [
+    "pydevd",
+    "django-debug-toolbar",
+    "pytest",
+    "pytest-django",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+# Testing dependencies
+test = [
+    "pytest",
+    "pytest-django",
+    "pytest-cov",
+    "factory-boy",
+]
+
+[project.urls]
+Homepage = "https://github.com/mediafactory/yats"
+Documentation = "https://github.com/mediafactory/yats#readme"
+Repository = "https://github.com/mediafactory/yats.git"
+"Bug Tracker" = "https://github.com/mediafactory/yats/issues"
+
+[project.scripts]
+yats-dev = "yats.dev:main"
+yats-migrate = "yats.management:run_migrations"
+yats-collectstatic = "yats.management:collect_static"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pydevd",
+    "django-debug-toolbar",
+    "pytest",
+    "pytest-django",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "django.*",
+    "haystack.*",
+    "djradicale.*",
+    "webservices.*",
+    "rpc4django.*",
+    "markdownx.*",
+    "background_task.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "sites.web.web.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = "--tb=short --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.coverage.run]
+source = ["modules/yats", "sites/web/web"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/test_*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
