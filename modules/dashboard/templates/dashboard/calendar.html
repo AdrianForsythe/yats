@@ -1,0 +1,209 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}Calendar & Timeline - YATS{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-calendar-alt"></i> Calendar & Timeline</h1>
+        <p>Schedule and timeline view of your tickets</p>
+    </div>
+
+    <!-- View Toggle -->
+    <div class="view-toggle">
+        <button class="toggle-btn active" onclick="showView('timeline')">
+            <i class="fas fa-timeline"></i> Timeline
+        </button>
+        <button class="toggle-btn" onclick="showView('calendar')">
+            <i class="fas fa-calendar"></i> Calendar
+        </button>
+        <button class="toggle-btn" onclick="showView('scheduled')">
+            <i class="fas fa-clock"></i> Scheduled
+        </button>
+    </div>
+
+    <!-- Timeline View -->
+    <div id="timeline-view" class="view-content active">
+        <h2><i class="fas fa-timeline"></i> Ticket Timeline</h2>
+        <div class="timeline-container">
+            <div class="timeline" id="ticket-timeline">
+                <div class="loading">Loading timeline...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar View -->
+    <div id="calendar-view" class="view-content">
+        <h2><i class="fas fa-calendar"></i> Calendar View</h2>
+        <div class="calendar-container">
+            <div class="calendar-header">
+                <button onclick="previousMonth()"><i class="fas fa-chevron-left"></i></button>
+                <h3 id="calendar-month"></h3>
+                <button onclick="nextMonth()"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="calendar-grid" id="calendar-grid">
+                <!-- Calendar will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scheduled Tickets View -->
+    <div id="scheduled-view" class="view-content">
+        <h2><i class="fas fa-clock"></i> Scheduled Tickets</h2>
+        <div class="scheduled-tickets">
+            {% for ticket in scheduled_tickets %}
+            <div class="scheduled-ticket">
+                <div class="ticket-info">
+                    <h4><a href="{{ ticket.get_absolute_url }}">#{{ ticket.id }} - {{ ticket.caption }}</a></h4>
+                    <p class="ticket-meta">
+                        <span class="ticket-type">{{ ticket.type.name|default:"No Type" }}</span>
+                        <span class="ticket-priority">{{ ticket.priority.name|default:"No Priority" }}</span>
+                        <span class="ticket-assigned">
+                            {% if ticket.assigned %}
+                                Assigned to: {{ ticket.assigned.username }}
+                            {% else %}
+                                Unassigned
+                            {% endif %}
+                        </span>
+                    </p>
+                </div>
+                <div class="schedule-info">
+                    <div class="schedule-date">
+                        <i class="fas fa-calendar"></i>
+                        {{ ticket.show_start|date:"M d, Y" }}
+                    </div>
+                    <div class="schedule-time">
+                        <i class="fas fa-clock"></i>
+                        {{ ticket.show_start|date:"H:i" }}
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="no-scheduled">
+                <i class="fas fa-calendar-times"></i>
+                <p>No scheduled tickets found</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Recently Closed -->
+    <div class="recently-closed">
+        <h2><i class="fas fa-check-circle"></i> Recently Closed</h2>
+        <div class="closed-tickets">
+            {% for ticket in recently_closed %}
+            <div class="closed-ticket">
+                <div class="ticket-info">
+                    <h4><a href="{{ ticket.get_absolute_url }}">#{{ ticket.id }} - {{ ticket.caption }}</a></h4>
+                    <p class="ticket-meta">
+                        <span class="ticket-type">{{ ticket.type.name|default:"No Type" }}</span>
+                        <span class="ticket-priority">{{ ticket.priority.name|default:"No Priority" }}</span>
+                    </p>
+                </div>
+                <div class="close-info">
+                    <div class="close-date">
+                        <i class="fas fa-calendar-check"></i>
+                        {{ ticket.close_date|date:"M d, Y H:i" }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+let currentDate = new Date();
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadTimelineData();
+    updateCalendar();
+});
+
+function showView(viewName) {
+    // Hide all views
+    document.querySelectorAll('.view-content').forEach(view => {
+        view.classList.remove('active');
+    });
+    
+    // Remove active class from all buttons
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show selected view
+    document.getElementById(viewName + '-view').classList.add('active');
+    
+    // Add active class to clicked button
+    event.target.classList.add('active');
+    
+    if (viewName === 'calendar') {
+        updateCalendar();
+    }
+}
+
+function loadTimelineData() {
+    fetch('/dashboard/api/timeline/')
+        .then(response => response.json())
+        .then(data => {
+            renderTimeline(data.tickets);
+        })
+        .catch(error => {
+            console.error('Error loading timeline data:', error);
+        });
+}
+
+function renderTimeline(tickets) {
+    const timeline = document.getElementById('ticket-timeline');
+    timeline.innerHTML = '';
+    
+    tickets.forEach(ticket => {
+        const timelineItem = document.createElement('div');
+        timelineItem.className = 'timeline-item';
+        
+        const statusClass = ticket.closed_status ? 'closed' : 'open';
+        const priorityClass = ticket.priority ? ticket.priority.toLowerCase().replace(' ', '-') : 'none';
+        
+        timelineItem.innerHTML = `
+            <div class="timeline-marker ${statusClass} ${priorityClass}"></div>
+            <div class="timeline-content">
+                <div class="timeline-header">
+                    <h4><a href="/tickets/view/${ticket.id}/">#${ticket.id} - ${ticket.caption}</a></h4>
+                    <span class="timeline-date">${new Date(ticket.created).toLocaleDateString()}</span>
+                </div>
+                <div class="timeline-meta">
+                    <span class="ticket-type">${ticket.type || 'No Type'}</span>
+                    <span class="ticket-priority">${ticket.priority || 'No Priority'}</span>
+                    ${ticket.assigned ? `<span class="ticket-assigned">${ticket.assigned}</span>` : ''}
+                </div>
+            </div>
+        `;
+        
+        timeline.appendChild(timelineItem);
+    });
+}
+
+function updateCalendar() {
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"];
+    
+    document.getElementById('calendar-month').textContent = 
+        `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+    
+    // Generate calendar grid (simplified version)
+    const calendarGrid = document.getElementById('calendar-grid');
+    calendarGrid.innerHTML = '<div class="calendar-placeholder">Calendar view would be implemented here with a proper calendar library like FullCalendar.js</div>';
+}
+
+function previousMonth() {
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    updateCalendar();
+}
+
+function nextMonth() {
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    updateCalendar();
+}
+</script>
+{% endblock %}

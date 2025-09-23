@@ -170,6 +170,7 @@
               {% SimpleSerch %}
 
               {% if request.session.isUsingYATSE %}
+              <li><a href="/dashboard/" class=""><i class="fa fa-tachometer-alt"></i> {% trans "Dashboard" %}</a></li>
               <li><a href="/docs/search/" class="">{% trans "documents" %}</a></li>
               <li><a href="{% YATSServer %}/board/" class="">{% trans "board" %}</a></li>
                 <li><a href="{% YATSServer %}/tickets/search/" class="">{% trans "search" %}</a></li>
@@ -202,6 +203,7 @@
                     </ul>
                 </li>
                 {% else %}
+                <li><a href="/dashboard/" class=""><i class="fa fa-tachometer-alt"></i> {% trans "Dashboard" %}</a></li>
                 <li><a href="/docs/search/" class="">{% trans "Documents" %}</a></li>
                 <li><a href="/reports/" class="">{% trans "Reports" %}</a></li>
                 <li class="dropdown">

@@ -1,0 +1,112 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}Dashboard - YATS{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+        <p>Analytics and timeline overview for your ticketing system</p>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Quick Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-ticket-alt"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>Total Tickets</h3>
+                    <div class="stat-number" id="total-tickets">-</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>Open Tickets</h3>
+                    <div class="stat-number" id="open-tickets">-</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>Closed Tickets</h3>
+                    <div class="stat-number" id="closed-tickets">-</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>Recent Activity</h3>
+                    <div class="stat-number" id="recent-activity">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Cards -->
+        <div class="nav-cards">
+            <a href="{% url 'analytics' %}" class="nav-card">
+                <div class="nav-icon">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <div class="nav-content">
+                    <h3>Analytics</h3>
+                    <p>Detailed metrics and statistics</p>
+                </div>
+            </a>
+            
+            <a href="{% url 'calendar' %}" class="nav-card">
+                <div class="nav-icon">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <div class="nav-content">
+                    <h3>Calendar & Timeline</h3>
+                    <p>Schedule and timeline view</p>
+                </div>
+            </a>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="recent-activity">
+            <h2><i class="fas fa-history"></i> Recent Activity</h2>
+            <div class="activity-list" id="recent-activity-list">
+                <div class="loading">Loading recent activity...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load dashboard data
+    loadDashboardData();
+});
+
+function loadDashboardData() {
+    // Load basic stats
+    fetch('/dashboard/api/analytics/')
+        .then(response => response.json())
+        .then(data => {
+            // Update stats (these would come from a separate endpoint in a real implementation)
+            document.getElementById('total-tickets').textContent = 'Loading...';
+            document.getElementById('open-tickets').textContent = 'Loading...';
+            document.getElementById('closed-tickets').textContent = 'Loading...';
+            document.getElementById('recent-activity').textContent = 'Loading...';
+        })
+        .catch(error => {
+            console.error('Error loading dashboard data:', error);
+        });
+}
+</script>
+{% endblock %}
