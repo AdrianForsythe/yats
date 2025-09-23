@@ -7,6 +7,39 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 from yats.models import tickets, ticket_type, ticket_priority, organisation, ticket_flow
 import json
+import pyodbc
+from django.conf import settings
+from .sequencing_config import SEQUENCING_DB_CONFIG
+
+
+def get_sequencing_connection():
+    """Get connection to HADES2017 sequencing database"""
+    try:
+        # Try FreeTDS first (works on Ubuntu 24.04)
+        if SEQUENCING_DB_CONFIG['driver'] == 'FreeTDS':
+            connection_string = (
+                f"DRIVER={{{SEQUENCING_DB_CONFIG['driver']}}};"
+                f"SERVER={SEQUENCING_DB_CONFIG['server']};"
+                f"PORT={SEQUENCING_DB_CONFIG['port']};"
+                f"DATABASE={SEQUENCING_DB_CONFIG['database']};"
+                f"UID={SEQUENCING_DB_CONFIG['username']};"
+                f"PWD={SEQUENCING_DB_CONFIG['password']};"
+                f"TDS_Version=8.0;"
+            )
+        else:
+            # Microsoft ODBC Driver
+            connection_string = (
+                f"DRIVER={{{SEQUENCING_DB_CONFIG['driver']}}};"
+                f"SERVER={SEQUENCING_DB_CONFIG['server']};"
+                f"DATABASE={SEQUENCING_DB_CONFIG['database']};"
+                f"UID={SEQUENCING_DB_CONFIG['username']};"
+                f"PWD={SEQUENCING_DB_CONFIG['password']};"
+            )
+        
+        return pyodbc.connect(connection_string)
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        return None
 
 
 @login_required
@@ -17,6 +50,153 @@ def dashboard_home(request):
         'breadcrumbs': [{'name': 'Dashboard', 'url': '/dashboard/'}]
     }
     return render(request, 'dashboard/home.html', context)
+
+
+@login_required
+def sequencing_analytics(request):
+    """Sequencing analytics based on Monday List data"""
+    conn = get_sequencing_connection()
+    if not conn:
+        # Provide demo data when database is not available
+        context = {
+            'error': 'Database connection not available. Showing demo data.',
+            'status_counts': {
+                'Received': 45,
+                'Accepted': 32,
+                'Library prepared': 28,
+                'Solexa Assigned': 15,
+                'Data Analysed': 67
+            },
+            'application_counts': {
+                'RNA-seq': 45,
+                'WGS': 32,
+                'ChIP-seq': 28,
+                'ATAC-seq': 15,
+                'scRNA-seq': 67
+            },
+            'user_counts': {
+                'John Doe': 45,
+                'Jane Smith': 32,
+                'Bob Johnson': 28,
+                'Alice Brown': 15,
+                'Charlie Wilson': 67
+            },
+            'total_samples': 187,
+            'recent_samples': 23,
+            'monday_list_data': [
+                ('Received', 'RNA-seq', '150bp', 'PE', 'John Doe', 5, 8, '2025/09/20'),
+                ('Accepted', 'WGS', '100bp', 'SE', 'Jane Smith', 3, 4, '2025/09/19'),
+                ('Library prepared', 'ChIP-seq', '75bp', 'PE', 'Bob Johnson', 2, 3, '2025/09/18'),
+            ],
+            'page_title': 'Sequencing Analytics'
+        }
+        return render(request, 'dashboard/sequencing_analytics_simple.html', context)
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Get Monday List data (similar to the R query)
+        monday_list_query = """
+        SELECT
+          StatusDescription as [Status],
+          ApplicationName as [Application],
+          RRLengthDisplay as [Machine_Read],
+        CASE
+            WHEN [HADES2017].[dbo].[tblD00Requests].PairedEndOption = 0 THEN 'SE'
+            WHEN [HADES2017].[dbo].[tblD00Requests].PairedEndOption = 1 THEN 'PE'
+            ELSE NULL
+        END as [Paired_end],
+        CustomerName as [User],
+        COUNT(*) as [N_samples],
+        PoolSize as [Pool_size],
+        convert(varchar, ReceiveDate, 111) as [Date_accepted]
+        FROM [HADES2017].[dbo].[tblD00Requests]
+          LEFT JOIN [HADES2017].[dbo].[tblD00Status]
+          ON [HADES2017].[dbo].[tblD00Requests].StatusID = [HADES2017].[dbo].[tblD00Status].StatusID
+          LEFT JOIN [HADES2017].[dbo].[tblD00RReadLength]
+          ON [HADES2017].[dbo].[tblD00Requests].RReadLengthID = [HADES2017].[dbo].[tblD00RReadLength].RReadLengthID
+          LEFT JOIN [HADES2017].[dbo].[tbl_Customers]
+          ON [HADES2017].[dbo].[tblD00Requests].CustomerID = [HADES2017].[dbo].[tbl_Customers].CustomerID
+          LEFT JOIN [HADES2017].[dbo].[tbl_Groups]
+          ON [HADES2017].[dbo].[tbl_Customers].GroupID = [HADES2017].[dbo].[tbl_Groups].GroupID
+          LEFT JOIN [HADES2017].[dbo].[tblD00SampleTypes]
+          ON [HADES2017].[dbo].[tblD00Requests].SampleTypeID =[HADES2017].[dbo].[tblD00SampleTypes].SampleTypeID
+          LEFT JOIN [HADES2017].[dbo].[tblD00Applications]
+          ON [HADES2017].[dbo].[tblD00Requests].ApplicationID =[HADES2017].[dbo].[tblD00Applications].ApplicationID
+        WHERE [HADES2017].[dbo].[tblD00Requests].StatusID IN (2,3,4,7,10)
+        GROUP BY ApplicationName,
+            CustomerName,
+            StatusDescription,
+            RRLengthDisplay,
+            PairedEndOption,
+            PoolSize,
+            convert(varchar,ReceiveDate, 111)
+        ORDER BY CASE
+            WHEN StatusDescription = 'Received' THEN '1'
+            WHEN StatusDescription = 'Accepted' THEN '2'
+            ELSE StatusDescription END ASC,
+          convert(varchar,ReceiveDate, 111), 
+          ApplicationName,
+            RRLengthDisplay,
+            CustomerName
+        """
+        
+        cursor.execute(monday_list_query)
+        monday_list_data = cursor.fetchall()
+        
+        # Process data for analytics
+        status_counts = {}
+        application_counts = {}
+        user_counts = {}
+        total_samples = 0
+        
+        for row in monday_list_data:
+            status = row[0]
+            application = row[1]
+            user = row[4]
+            n_samples = row[5]
+            
+            # Count by status
+            status_counts[status] = status_counts.get(status, 0) + n_samples
+            
+            # Count by application
+            application_counts[application] = application_counts.get(application, 0) + n_samples
+            
+            # Count by user
+            user_counts[user] = user_counts.get(user, 0) + n_samples
+            
+            total_samples += n_samples
+        
+        # Get recent activity (last 30 days)
+        recent_query = """
+        SELECT COUNT(*) as recent_samples
+        FROM [HADES2017].[dbo].[tblD00Requests]
+        WHERE ReceiveDate >= DATEADD(day, -30, GETDATE())
+        """
+        cursor.execute(recent_query)
+        recent_samples = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        context = {
+            'status_counts': status_counts,
+            'application_counts': application_counts,
+            'user_counts': dict(sorted(user_counts.items(), key=lambda x: x[1], reverse=True)[:10]),
+            'total_samples': total_samples,
+            'recent_samples': recent_samples,
+            'monday_list_data': monday_list_data,
+            'page_title': 'Sequencing Analytics'
+        }
+        
+        return render(request, 'dashboard/sequencing_analytics_simple.html', context)
+        
+    except Exception as e:
+        conn.close()
+        context = {
+            'error': f'Database query error: {str(e)}',
+            'page_title': 'Sequencing Analytics'
+        }
+        return render(request, 'dashboard/sequencing_analytics_simple.html', context)
 
 
 @login_required

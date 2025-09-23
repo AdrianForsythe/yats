@@ -60,6 +60,8 @@ dependencies = [
     "six",
     "haystack>=0.42",
     "django-haystack>=3.3.0",
+    "pyodbc>=5.2.0",
+    "python-dotenv>=1.1.1",
 ]
 
 [project.optional-dependencies]
