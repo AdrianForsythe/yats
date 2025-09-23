@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'bootstrap_toolkit',
     'yats',
     'web',
+    'dashboard',  # Add dashboard app
     'markdownx',
     'haystack',  # Add haystack back
     'background_task',
@@ -61,6 +62,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.static',
             ],
         },
     },
@@ -125,7 +127,7 @@ FILE_UPLOAD_VIRUS_SCAN = False
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Project name
-PROJECT_NAME = 'YATS-Development'
+PROJECT_NAME = 'GeneCore-Ticketing-Dev'
 
 # Logging
 LOGGING = {
