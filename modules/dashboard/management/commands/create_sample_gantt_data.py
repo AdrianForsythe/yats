@@ -86,6 +86,20 @@ class Command(BaseCommand):
         start_date = timezone.now()
         machine_flowcell_default_runtime = pd.read_csv('modules/dashboard/machine_default_run_times.tsv', sep='\t')
         
+        # Define colors for different machine types
+        machine_colors = {
+            'miseq i100': '#FF5722',      # Deep Orange
+            'Nextseq 2000': '#3F51B5',   # Indigo
+            'Aviti High': '#4CAF50',      # Green
+            'Aviti Medium': '#8BC34A',    # Light Green
+            'Aviti Low': '#CDDC39',       # Lime
+            'NovaSeq 6000': '#9C27B0',    # Purple
+            'PacBio Sequel II e': '#FF9800',  # Orange
+            'ONT PromethION': '#607D8B',  # Blue Grey
+            'ONT GridION': '#795548',     # Brown
+            'ONT MinION': '#FFC107'       # Amber
+        }
+        
         # Group by machine to create parent tasks
         machines = machine_flowcell_default_runtime['machine'].unique()
         machine_tasks = {}
@@ -116,9 +130,11 @@ class Command(BaseCommand):
                 continue
                 
             # Calculate parent task span (from start of first task to end of last task)
-            # For simplicity, we'll use the longest runtime as the parent duration
             max_runtime = max(subtask['runtime'] for subtask in subtasks)
             parent_duration = max_runtime / 24  # Convert hours to days
+            
+            # Get color for this machine type
+            machine_color = machine_colors.get(machine, '#757575')  # Default grey
             
             # Create parent task that spans the entire machine project
             machine_task = Task.objects.create(
@@ -128,7 +144,8 @@ class Command(BaseCommand):
                 duration=parent_duration,
                 progress=0.0,
                 parent="0",
-                sort_order=len(machine_tasks) + 1
+                sort_order=len(machine_tasks) + 1,
+                color=machine_color
             )
             machine_tasks[machine] = machine_task
             
@@ -144,6 +161,9 @@ class Command(BaseCommand):
                 else:
                     type_str = f" {type_val}"
                 
+                # Create subtask with lighter version of parent color
+                subtask_color = self.lighten_color(machine_color, 0.3)
+                
                 # Create subtask
                 task = Task.objects.create(
                     text=f"{flowcell}{type_str}",
@@ -152,9 +172,23 @@ class Command(BaseCommand):
                     duration=runtime,
                     progress=0.0,
                     parent=str(machine_task.id),
-                    sort_order=subtask['index']
+                    sort_order=subtask['index'],
+                    color=subtask_color
                 )
         
         self.stdout.write(
             self.style.SUCCESS('Successfully created sample Gantt chart data for machine projects')
         )
+
+    def lighten_color(self, hex_color, factor):
+        """Lighten a hex color by a factor (0-1)"""
+        hex_color = hex_color.lstrip('#')
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        
+        r = min(255, int(r + (255 - r) * factor))
+        g = min(255, int(g + (255 - g) * factor))
+        b = min(255, int(b + (255 - b) * factor))
+        
+        return f"#{r:02x}{g:02x}{b:02x}"

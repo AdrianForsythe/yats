@@ -10,7 +10,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ('id', 'text', 'start_date', 'end_date', 'duration', 'progress', 'parent', 'sort_order')
+        fields = ('id', 'text', 'start_date', 'end_date', 'duration', 'progress', 'parent', 'sort_order', 'color')
 
 
 class LinkSerializer(serializers.ModelSerializer):
