@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'markdownx',
     'haystack',  # Add haystack back
     'background_task',
+    'rest_framework',  # Add Django REST Framework
 ]
 
 # Configure haystack with simple backend (no external dependencies)
