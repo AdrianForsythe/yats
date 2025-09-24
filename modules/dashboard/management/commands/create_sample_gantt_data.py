@@ -81,6 +81,7 @@ class Command(BaseCommand):
         - Create parent tasks for each machine
         - Create subtasks for each flowcell+type combination
         - Skip rows with missing runtime values
+        - Parent tasks span the entire duration of their subtasks
         """
         start_date = timezone.now()
         machine_flowcell_default_runtime = pd.read_csv('modules/dashboard/machine_default_run_times.tsv', sep='\t')
@@ -89,46 +90,70 @@ class Command(BaseCommand):
         machines = machine_flowcell_default_runtime['machine'].unique()
         machine_tasks = {}
         
-        for machine in machines:
-            # Create parent task for each machine
+        # First pass: collect all subtasks for each machine to calculate parent span
+        machine_subtasks = {}
+        for index, row in machine_flowcell_default_runtime.iterrows():
+            machine = row['machine']
+            runtime = row['runtime']
+            
+            # Skip rows with missing runtime values
+            if pd.isna(runtime) or runtime == '' or runtime is None:
+                continue
+                
+            if machine not in machine_subtasks:
+                machine_subtasks[machine] = []
+            
+            machine_subtasks[machine].append({
+                'flowcell': row['flowcell'],
+                'type': row['type'],
+                'runtime': runtime,
+                'index': index
+            })
+        
+        # Create parent tasks and subtasks
+        for machine, subtasks in machine_subtasks.items():
+            if not subtasks:
+                continue
+                
+            # Calculate parent task span (from start of first task to end of last task)
+            # For simplicity, we'll use the longest runtime as the parent duration
+            max_runtime = max(subtask['runtime'] for subtask in subtasks)
+            parent_duration = max_runtime / 24  # Convert hours to days
+            
+            # Create parent task that spans the entire machine project
             machine_task = Task.objects.create(
                 text=f"{machine}",
                 start_date=start_date,
-                end_date=start_date + timedelta(days=1),  # Will be updated later
-                duration=1,
+                end_date=start_date + timedelta(hours=max_runtime),
+                duration=parent_duration,
                 progress=0.0,
                 parent="0",
                 sort_order=len(machine_tasks) + 1
             )
             machine_tasks[machine] = machine_task
-        
-        # Create subtasks for each flowcell+type combination
-        for index, row in machine_flowcell_default_runtime.iterrows():
-            machine = row['machine']
-            flowcell = row['flowcell']
-            runtime = row['runtime']
-            type_val = row['type']
             
-            # Skip rows with missing runtime values
-            if pd.isna(runtime) or runtime == '' or runtime is None:
-                continue
-            
-            # Handle empty type values
-            if pd.isna(type_val) or type_val == '' or type_val == 'nan':
-                type_str = ""
-            else:
-                type_str = f" {type_val}"
-            
-            # Create subtask
-            task = Task.objects.create(
-                text=f"{flowcell}{type_str}",
-                start_date=start_date,
-                end_date=start_date + timedelta(hours=runtime),
-                duration=runtime,
-                progress=0.0,
-                parent=str(machine_tasks[machine].id),
-                sort_order=index
-            )
+            # Create subtasks for this machine
+            for subtask in subtasks:
+                flowcell = subtask['flowcell']
+                type_val = subtask['type']
+                runtime = subtask['runtime']
+                
+                # Handle empty type values
+                if pd.isna(type_val) or type_val == '' or type_val == 'nan':
+                    type_str = ""
+                else:
+                    type_str = f" {type_val}"
+                
+                # Create subtask
+                task = Task.objects.create(
+                    text=f"{flowcell}{type_str}",
+                    start_date=start_date,
+                    end_date=start_date + timedelta(hours=runtime),
+                    duration=runtime,
+                    progress=0.0,
+                    parent=str(machine_task.id),
+                    sort_order=subtask['index']
+                )
         
         self.stdout.write(
             self.style.SUCCESS('Successfully created sample Gantt chart data for machine projects')
