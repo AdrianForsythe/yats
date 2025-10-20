@@ -121,6 +121,9 @@ class TicketsForm(forms.ModelForm):
                 flows.append(self.instance.state_id)
                 self.fields['state'].queryset = self.fields['state'].queryset.filter(id__in=flows)
 
+        if 'organisation' in self.fields:
+            self.fields['organisation'].queryset = self.fields['organisation'].queryset.filter(pk=self.customer)
+
     def save(self, commit=True):
         """
         Saves this ``form``'s cleaned_data into model instance

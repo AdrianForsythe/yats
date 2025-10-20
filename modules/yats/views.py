@@ -249,6 +249,7 @@ def kanban(request):
     flows = ticket_flow.objects.all().order_by('type')
     columns = []
     finish_state = -1
+    start_state = -1  # Initialize with default value
     days = UserProfile.objects.get(user=request.user).day_since_closed_tickets
 
     query = get_ticket_model().objects.select_related('type', 'state', 'assigned', 'priority', 'customer').all()

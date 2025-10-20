@@ -35,6 +35,7 @@
     </div>
 
     <form method="post" name="data">
+      {% csrf_token %}
       <input type="hidden" id="query" name="query" />
     </form>
 
