@@ -3,6 +3,12 @@ import os
 import sys
 
 if __name__ == "__main__":
+    # Add modules directory to path
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    modules_path = os.path.join(BASE_DIR, '..', '..', '..', 'modules')
+    if modules_path not in sys.path:
+        sys.path.insert(0, modules_path)
+
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "web.settings")
     try:
         from django.core.management import execute_from_command_line

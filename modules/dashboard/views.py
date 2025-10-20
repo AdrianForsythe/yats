@@ -431,6 +431,13 @@ def gantt_task_update(request, pk):
     except Task.DoesNotExist:
         return JsonResponse({'action': 'error2'})
 
+    # Prevent modification of readonly tasks
+    if task.readonly:
+        return JsonResponse({
+            'action': 'error',
+            'message': 'Cannot modify readonly task'
+        }, status=403)
+
     if request.method == 'PUT':
         serializer = TaskSerializer(task, data=request.data)
         if serializer.is_valid():

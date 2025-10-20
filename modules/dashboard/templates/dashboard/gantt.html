@@ -24,6 +24,22 @@ gantt.config.order_branch = "marker";
 gantt.config.order_branch_free = true;
 gantt.config.open_tree_initially = true;
 
+// Customize task classes based on readonly status
+gantt.templates.task_class = function(start, end, task) {
+    if (task.readonly) {
+        return "gantt_readonly_task";
+    }
+    return "";
+};
+
+// Customize grid row classes
+gantt.templates.grid_row_class = function(start, end, task) {
+    if (task.readonly) {
+        return "gantt_readonly_row";
+    }
+    return "";
+};
+
 gantt.attachEvent("onLoadEnd", function() {
     gantt.batchUpdate(function() {
         gantt.sort("sort_order", false)
@@ -31,6 +47,11 @@ gantt.attachEvent("onLoadEnd", function() {
 });
 
 gantt.attachEvent("onRowDragEnd", function(id, target) {
+    var task = gantt.getTask(id);
+    // Prevent dragging readonly tasks
+    if (task.readonly) {
+        return false;
+    }
     //update the order of tasks
     gantt.batchUpdate(function() {
         gantt.eachTask(function(task) {
@@ -42,6 +63,52 @@ gantt.attachEvent("onRowDragEnd", function(id, target) {
 
 gantt.attachEvent("onBeforeTaskAdd", function(id, task) {
     task.sort_order = task.$local_index + 1;
+    return true;
+});
+
+// Prevent editing readonly tasks
+gantt.attachEvent("onBeforeTaskChanged", function(id, mode, task) {
+    if (task.readonly) {
+        gantt.message({
+            type: "error",
+            text: "This task is read-only and cannot be modified"
+        });
+        return false;
+    }
+    return true;
+});
+
+// Prevent deleting readonly tasks
+gantt.attachEvent("onBeforeTaskDelete", function(id, task) {
+    if (task.readonly) {
+        gantt.message({
+            type: "error",
+            text: "This task is read-only and cannot be deleted"
+        });
+        return false;
+    }
+    return true;
+});
+
+// Prevent dragging readonly tasks
+gantt.attachEvent("onBeforeTaskDrag", function(id, mode, e) {
+    var task = gantt.getTask(id);
+    if (task.readonly) {
+        return false;
+    }
+    return true;
+});
+
+// Prevent opening lightbox for readonly tasks
+gantt.attachEvent("onBeforeLightbox", function(id) {
+    var task = gantt.getTask(id);
+    if (task.readonly) {
+        gantt.message({
+            type: "info",
+            text: "This is a read-only task from MinKNOW"
+        });
+        return false;
+    }
     return true;
 });
 
@@ -74,6 +141,36 @@ dp.setTransactionMode("REST");
 .dashboard-header p {
     color: #7f8c8d;
     font-size: 16px;
+}
+
+/* Readonly task styles */
+.gantt_readonly_task {
+    opacity: 0.85;
+    cursor: not-allowed !important;
+}
+
+.gantt_readonly_task .gantt_task_content {
+    cursor: not-allowed !important;
+}
+
+.gantt_readonly_row {
+    background-color: #f9f9f9;
+    font-style: italic;
+}
+
+.gantt_readonly_row .gantt_cell {
+    color: #666;
+}
+
+/* Add a lock icon indicator for readonly tasks */
+.gantt_readonly_task::after {
+    content: "🔒";
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    opacity: 0.6;
 }
 </style>
 {% endblock %}
