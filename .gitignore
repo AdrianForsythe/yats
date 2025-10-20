@@ -27,3 +27,4 @@ venv.bak/
 *.sqlite*
 
 data/static/
+data/db/yats_dev.sqlite
