@@ -1,1 +1,1 @@
-# Dashboard management commands
+# -*- coding: utf-8 -*-

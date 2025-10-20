@@ -1,0 +1,64 @@
+machine	flowcell	type	runtime
+miseq i100	1 x 100 bp	5Ma	
+miseq i100	2 x 150 bp	5Ma	7
+miseq i100	2 x 300 bp	5Ma	15
+miseq i100	1 x 100 bp	25Ma	4
+miseq i100	2 x 150 bp	25Ma	7
+miseq i100	2 x 300 bp	25Ma	15
+miseq i100	1 x 100 bp	50Mb	4.5
+miseq i100	2 x 150 bp	50Mb	7.5
+miseq i100	2 x 300 bp	50Mb	15.5
+miseq i100	1 x 100 bp	100Mb	5
+miseq i100	2 x 150 bp	100Mb	8
+miseq i100	2 x 300 bp	100Mb	
+Nextseq 2000	1 x 50 bp	P1	
+Nextseq 2000	2 x 50 bp	P1	8
+Nextseq 2000	2 x 100 bp	P1	
+Nextseq 2000	2 x 150 bp	P1	17
+Nextseq 2000	2 x 300 bp	P1	34
+Nextseq 2000	1 x 50 bp	P2	
+Nextseq 2000	2 x 50 bp	P2	12
+Nextseq 2000	2 x 100 bp	P2	19
+Nextseq 2000	2 x 150 bp	P2	22
+Nextseq 2000	2 x 300 bp	P2	42
+Nextseq 2000	1 x 50 bp	P3	
+Nextseq 2000	2 x 50 bp	P3	18
+Nextseq 2000	2 x 100 bp	P3	31
+Nextseq 2000	2 x 150 bp	P3	40
+Nextseq 2000	1 x 50 bp	P4	12
+Nextseq 2000	2 x 50 bp	P4	20
+Nextseq 2000	2 x 100 bp	P4	34
+Nextseq 2000	2 x 150 bp	P4	44
+Aviti High	2 x 300		60
+Aviti High	2 x 150		38
+Aviti High	2 x 75		24
+Aviti Medium	2 x 300		51
+Aviti Medium	2 x 150		31
+Aviti Medium	2 x 75		20
+Aviti Low	2 x 150		27
+Aviti Low	2 x 75c		17
+NovaSeq 6000	1 x 35 bp	SP	
+NovaSeq 6000	2 x 50 bp	SP	13
+NovaSeq 6000	2 x 100 bp	SP	19
+NovaSeq 6000	2 x 150 bp	SP	25
+NovaSeq 6000	2 x 250 bp	SP	38
+NovaSeq 6000	1 x 35 bp	S1	
+NovaSeq 6000	2 x 50 bp	S1	13
+NovaSeq 6000	2 x 100 bp	S1	19
+NovaSeq 6000	2 x 150 bp	S1	25
+NovaSeq 6000	2 x 250 bp	S1	
+NovaSeq 6000	1 x 35 bp	S2	
+NovaSeq 6000	2 x 50 bp	S2	16
+NovaSeq 6000	2 x 100 bp	S2	25
+NovaSeq 6000	2 x 150 bp	S2	36
+NovaSeq 6000	2 x 250 bp	S2	
+NovaSeq 6000	1 x 35 bp	S4	14
+NovaSeq 6000	2 x 50 bp	S4	
+NovaSeq 6000	2 x 100 bp	S4	36
+NovaSeq 6000	2 x 150 bp	S4	44
+NovaSeq 6000	2 x 250 bp	S4	
+PacBio Sequel II e			15
+PacBio Sequel II e			30
+ONT PromethION			72
+ONT GridION			72
+ONT MinION			72
