@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from django.template import loader, RequestContext
+from django.template import loader
 from django.http import HttpResponse
 from django.conf import settings
 from django.contrib.auth import authenticate, login, get_user
@@ -18,7 +18,7 @@ def OrgaAdditionMiddleware(get_response):
                 pass
 
             if not hasattr(request, 'organisation') or not request.organisation:
-                response = HttpResponse(loader.render_to_string('no_orga.html', {'source': 'middleware', 'request_path': request.build_absolute_uri()}, RequestContext(request)))
+                response = HttpResponse(loader.render_to_string('no_orga.html', {'source': 'middleware', 'request_path': request.build_absolute_uri()}, request=request))
                 response.status_code = 200
                 return response
             return get_response(request)
@@ -86,7 +86,7 @@ class BasicAuthMiddleware:
         #
         from socket import gethostname
 
-        response = HttpResponse(loader.render_to_string('401.html', {'source': 'middleware', 'request_path': request.build_absolute_uri(), 'hostname': gethostname()}, RequestContext(request)))
+        response = HttpResponse(loader.render_to_string('401.html', {'source': 'middleware', 'request_path': request.build_absolute_uri(), 'hostname': gethostname()}, request=request))
         response.status_code = 401
         response['WWW-Authenticate'] = 'Basic realm="%s"' % self.realm
         return response
