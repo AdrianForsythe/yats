@@ -26,17 +26,51 @@ STATIC_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.pa
 TEMP_ROOT = '/tmp/'
 
 # Override logging for local development
-LOGGING['handlers']['request_handler']['filename'] = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 
+# Ensure logging dict pieces exist
+LOGGING.setdefault('formatters', {})
+LOGGING.setdefault('handlers', {})
+LOGGING.setdefault('loggers', {})
+
+log_file_path = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
     'data', 'logs', 'django_request.log'
 )
+
+# Add a simple formatter if missing
+if 'simple' not in LOGGING['formatters']:
+    LOGGING['formatters']['simple'] = {
+        'format': '%(asctime)s %(levelname)s %(name)s: %(message)s'
+    }
+
+# Create request file handler if missing
+if 'request_handler' not in LOGGING['handlers']:
+    LOGGING['handlers']['request_handler'] = {
+        'level': 'INFO',
+        'class': 'logging.FileHandler',
+        'filename': log_file_path,
+        'formatter': 'simple',
+    }
+else:
+    # If present, just enforce filename
+    LOGGING['handlers']['request_handler']['filename'] = log_file_path
+
+# Route django.request logs to the file handler
+LOGGING['loggers'].setdefault('django.request', {
+    'handlers': ['request_handler', 'console'],
+    'level': 'INFO',
+    'propagate': False,
+})
 
 # Ensure log directory exists
 log_dir = os.path.dirname(LOGGING['handlers']['request_handler']['filename'])
 os.makedirs(log_dir, exist_ok=True)
 
-# Override search index path for local development (disabled)
-HAYSTACK_CONNECTIONS = {}
+# Haystack: keep a minimal default alias so imports work
+HAYSTACK_CONNECTIONS = {
+    'default': {
+        'ENGINE': 'haystack.backends.simple_backend.SimpleEngine',
+    },
+}
 
 # Disable virus scanning for local development (optional)
 FILE_UPLOAD_VIRUS_SCAN = False
