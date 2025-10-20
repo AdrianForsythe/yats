@@ -1,0 +1,3 @@
+[submodule "modules/runner/gc_connect"]
+	path = modules/runner/gc_connect
+	url = git@git.embl.de:grp-genecore/operation/genecore-python-connector.git
