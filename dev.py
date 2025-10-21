@@ -19,13 +19,17 @@ def main():
     # Change to web directory
     web_dir = os.path.join(project_root, 'sites', 'web')
     
+    print("Syncing tickets already existing in HADES")
+    pre_cmd = ['uv', 'run', 'python', 'manage.py', 'create_sequencing_tickets']
+    subprocess.run(pre_cmd, cwd=web_dir, env=env)
+
     print("🚀 Starting YATS Development Server...")
     print("📁 Project root:", project_root)
     print("🌐 Server will be available at: http://localhost:8000")
     print("�� Admin interface: http://localhost:8000/admin")
     print("�� Username: admin, Password: admin")
     print("\nPress Ctrl+C to stop the server\n")
-    
+
     # Run Django development server with simplified settings
     cmd = [
         'uv', 'run', 'python', 'manage.py', 'runserver', 

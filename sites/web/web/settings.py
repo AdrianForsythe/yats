@@ -25,7 +25,7 @@ INSTALLED_APPS = [
     'bootstrap_toolkit',
     'yats',
     'web',
-    'dashboard',  # Add dashboard app
+    'modules.dashboard',
     'markdownx',
     'haystack',  # Add haystack back
     'background_task',
