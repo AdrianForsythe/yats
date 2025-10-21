@@ -924,12 +924,20 @@ def table(request, **kwargs):
             tic = tic.filter(customer=request.organisation)
 
     sort = request.GET.get('sort', 'desc')
-    col = request.GET.get('col', 'id')
-    # if only sort by id, add prio order
-    if col == 'id' and sort == 'desc':
-        args = ('-priority', '%s%s' % ('-' if sort == 'desc' else '', col))
+    col = request.GET.get('col', 'priority') # Changed default to priority
+    
+    # Build the ordering args
+    if col == 'priority':
+        if sort == 'desc':
+            args = ('-priority', 'id')
+        else:
+            args = ('priority', 'id') 
+    elif col == 'id' and sort == 'desc':
+        args = ('-priority', '-id')
     else:
+        # For any other column
         args = ('%s%s' % ('-' if sort == 'desc' else '', col))
+    
     tic = tic.order_by(*args)
 
     list_caption = kwargs.get('list_caption')

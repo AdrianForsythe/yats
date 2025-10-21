@@ -16,7 +16,7 @@
         <table class="table table-striped table-hover">
             <thead>
             <tr>
-                <th>{% trans "priority" %}</th>
+                <th>{% trans "priority" %}{% if col == "priority" %}&nbsp;<a href="?sort={% if sort == "desc" %}asc{% else %}desc{% endif %}&col=priority"><i class="fa fa-sort-numeric-{{ sort }}" aria-hidden="true"></i></a>{% endif %}</th>
                 <th></th>
                 <th>{% trans "ticket#" %}{% if col == "id" %}&nbsp;<a href="?sort={% if sort == "asc" %}desc{% else %}asc{% endif %}&col=id"><i class="fa fa-sort-numeric-{{ sort }}" aria-hidden="true"></i></a>{% endif %}</th>
                 <th>{% trans "created" %}</th>
