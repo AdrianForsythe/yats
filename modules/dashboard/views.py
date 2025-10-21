@@ -16,7 +16,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 
-def get_sequencing_connection():
+def get_hades_connection():
     """Get connection to HADES2017 sequencing database"""
     try:
         # Try FreeTDS first (works on Ubuntu 24.04)
@@ -72,7 +72,7 @@ def gantt_view(request):
 @login_required
 def sequencing_analytics(request):
     """Sequencing analytics based on Monday List data"""
-    conn = get_sequencing_connection()
+    conn = get_hades_connection()
     if not conn:
         # Provide demo data when database is not available
         context = {
