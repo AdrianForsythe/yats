@@ -507,10 +507,7 @@ def gantt_data_list(request, offset=0):
                 tasks.append(subtask)
                 task_id_counter += 1
                 subtask_counter += 1
-        
-        print(f"Gantt API called - returning {len(tasks)} tasks from {tickets.count()} tickets")
-        print(f"First few tasks: {[{'id': t['id'], 'text': t['text']} for t in tasks[:3]]}")
-        
+               
         response = Response({
             "tasks": tasks,
             "links": []  # No links for now
@@ -652,9 +649,7 @@ def gantt_task_update(request, pk):
         return JsonResponse({'action': 'error'})
 
     if request.method == 'DELETE':
-        print(f"Deleting task {task.id}: {task.text}")
         task.delete()
-        print(f"Task {task.id} deleted successfully")
         return JsonResponse({'action': 'deleted'})
 
 
