@@ -20,9 +20,6 @@ sites=`python3 -c "import site; print(site.getsitepackages()[0])"`
 you may try...
 2to3 -w xyz.py
 
-try to install all libs via pip3!
-pip3 install -r /vagrant/requirements.txt
-
 
 ####
 https://docs.python.org/3/howto/pyporting.html

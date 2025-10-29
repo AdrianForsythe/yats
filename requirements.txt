@@ -1,5 +1,4 @@
 # YATS Requirements for local development
-# Based on vagrant/requirements.txt with version updates for Python 3.11
 
 # Core Django
 Django>=5.0.0,<6.0.0

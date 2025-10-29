@@ -27,15 +27,6 @@ Customer User:
 Login: customer.user  
 Password: qwertz  
 
-Or use vagrant!  
-
-VAGRANT
------
-howto:
-```
-$ cd vagrant
-$ vagrant up
-```
 Wait! :-)
 Point your browser at:
 http://192.168.33.11
