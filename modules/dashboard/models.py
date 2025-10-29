@@ -12,6 +12,9 @@ class Task(models.Model):
     parent = models.CharField(max_length=100)
     sort_order = models.IntegerField(default=0)
     color = models.CharField(max_length=7, default='#4CAF50', help_text='Hex color code for the task')
+    external_id = models.CharField(max_length=255, default='')
+    readonly = models.BooleanField(default=False)
+    source = models.CharField(max_length=50, default='ticket')
 
     class Meta:
         db_table = 'dashboard_task'

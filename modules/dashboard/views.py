@@ -398,16 +398,229 @@ def ticket_timeline_api(request):
 @login_required
 @api_view(['GET'])
 def gantt_data_list(request, offset=0):
-    """API endpoint for Gantt chart data"""
+    """API endpoint for Gantt chart data - reads directly from tickets table"""
     if request.method == 'GET':
-        tasks = Task.objects.all()
-        links = Link.objects.all()
-        taskData = TaskSerializer(tasks, many=True)
-        linkData = LinkSerializer(links, many=True)
-        return Response({
-            "tasks": taskData.data,
-            "links": linkData.data
+        from yats.shortcuts import get_ticket_model
+        from yats.models import ticket_flow
+        
+        Ticket = get_ticket_model()
+        
+        # Get closed state names to filter out
+        closed_states = ['Finished', 'Canceled', 'Deleted']
+        
+        # Get all tickets (same logic as the management command)
+        tickets = Ticket.objects.filter(active_record=True)
+        tickets = tickets.exclude(
+            state__name__in=closed_states
+        ).exclude(closed=True)
+        
+        # Convert tickets to Gantt chart format
+        tasks = []
+        task_id_counter = 1000  # Start from 1000 to avoid conflicts
+        
+        # Define colors for different ticket types/priorities
+        type_colors = {
+            'Bug': '#F44336',      # Red
+            'Feature': '#4CAF50',  # Green
+            'Task': '#2196F3',     # Blue
+            'Enhancement': '#FF9800',  # Orange
+            'Sequencing': '#9C27B0',   # Purple
+        }
+        
+        priority_colors = {
+            'High': '#F44336',     # Red
+            'Medium': '#FF9800',   # Orange
+            'Low': '#4CAF50',      # Green
+            'Critical': '#D32F2F', # Dark Red
+        }
+        
+        for ticket in tickets:
+            # Determine task color based on type or priority
+            color = '#757575'  # Default grey
+            
+            if ticket.type and ticket.type.name in type_colors:
+                color = type_colors[ticket.type.name]
+            elif ticket.priority and ticket.priority.name in priority_colors:
+                color = priority_colors[ticket.priority.name]
+            
+            # Calculate task dates
+            start_date = ticket.c_date
+            if ticket.show_start:
+                start_date = ticket.show_start
+            
+            # For closed tickets, use close_date as end_date
+            # For open tickets, use current time as end_date
+            if ticket.closed and ticket.close_date:
+                end_date = ticket.close_date
+            else:
+                end_date = timezone.now()
+            
+            # Calculate duration in days
+            duration = (end_date - start_date).days + 1  # +1 to include both start and end days
+            
+            # Calculate progress based on ticket state
+            progress = 0.0
+            if ticket.closed:
+                progress = 1.0
+            elif ticket.state:
+                progress = 0.3  # Default progress for open tickets
+            
+            # Create main task
+            main_task = {
+                'id': task_id_counter,
+                'text': f"#{ticket.id}: {ticket.caption}",
+                'start_date': start_date.strftime('%Y-%m-%d %H:%M'),
+                'end_date': end_date.strftime('%Y-%m-%d %H:%M'),
+                'duration': duration,
+                'progress': progress,
+                'parent': '0',
+                'sort_order': ticket.id,
+                'color': color,
+                'external_id': f"ticket_{ticket.id}",
+                'readonly': False,
+                'source': 'ticket'
+            }
+            tasks.append(main_task)
+            task_id_counter += 1
+            
+            # Create subtasks only for current status (no static metadata)
+            # TODO: In the future, this should be replaced with historical status changes
+            # from the tickets_history table to show time spent in each status
+            subtask_counter = 1
+            
+            # Only create a subtask for the current status if it's meaningful
+            if ticket.state and ticket.state.name not in ['', 'New', 'Open', 'Default Flow']:
+                subtask = {
+                    'id': task_id_counter,
+                    'text': f"Current Status: {ticket.state.name}",
+                    'start_date': start_date.strftime('%Y-%m-%d %H:%M'),
+                    'end_date': end_date.strftime('%Y-%m-%d %H:%M'),
+                    'duration': duration,
+                    'progress': progress,
+                    'parent': str(main_task['id']),
+                    'sort_order': subtask_counter,
+                    'color': lighten_color(color, 0.3),
+                    'external_id': f"ticket_{ticket.id}_current_status",
+                    'readonly': True,
+                    'source': 'ticket'
+                }
+                tasks.append(subtask)
+                task_id_counter += 1
+                subtask_counter += 1
+        
+        print(f"Gantt API called - returning {len(tasks)} tasks from {tickets.count()} tickets")
+        print(f"First few tasks: {[{'id': t['id'], 'text': t['text']} for t in tasks[:3]]}")
+        
+        response = Response({
+            "tasks": tasks,
+            "links": []  # No links for now
         })
+        
+        # Add cache-busting headers
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        
+        return response
+
+def lighten_color(hex_color, factor):
+        """Lighten a hex color by a factor (0-1)"""
+        hex_color = hex_color.lstrip('#')
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        
+        r = min(255, int(r + (255 - r) * factor))
+        g = min(255, int(g + (255 - g) * factor))
+        b = min(255, int(b + (255 - b) * factor))
+        
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def create_status_history_subtasks(ticket, main_task, task_id_counter):
+    """
+    Future enhancement: Create subtasks based on status change history.
+    This function will be used when we have historical status data from tickets_history.
+    
+    For now, this is a placeholder that shows how status history subtasks would work.
+    """
+    from yats.models import tickets_history
+    import json
+    from datetime import datetime
+    
+    subtasks = []
+    subtask_counter = 1
+    
+    # Get status change history for this ticket
+    history_records = tickets_history.objects.filter(
+        ticket=ticket,
+        action=11  # State change action
+    ).order_by('c_date')
+    
+    if not history_records.exists():
+        return subtasks, task_id_counter
+    
+    # Process status changes chronologically
+    status_periods = []
+    current_status = None
+    status_start_date = ticket.c_date
+    
+    for record in history_records:
+        try:
+            old_data = json.loads(record.old)
+            new_data = json.loads(record.new)
+            
+            old_state = old_data.get('state', '')
+            new_state = new_data.get('state', '')
+            
+            # If we have a previous status period, close it
+            if current_status and current_status != old_state:
+                status_periods.append({
+                    'status': current_status,
+                    'start_date': status_start_date,
+                    'end_date': record.c_date
+                })
+            
+            # Start new status period
+            current_status = new_state
+            status_start_date = record.c_date
+            
+        except (json.JSONDecodeError, KeyError):
+            continue
+    
+    # Close the final status period
+    if current_status:
+        end_date = ticket.close_date if ticket.closed else timezone.now()
+        status_periods.append({
+            'status': current_status,
+            'start_date': status_start_date,
+            'end_date': end_date
+        })
+    
+    # Create subtasks for each status period
+    for period in status_periods:
+        if period['status'] and period['status'] not in ['', 'New', 'Open']:
+            duration = (period['end_date'] - period['start_date']).days + 1
+            
+            subtask = {
+                'id': task_id_counter,
+                'text': f"Status: {period['status']}",
+                'start_date': period['start_date'].strftime('%Y-%m-%d %H:%M'),
+                'end_date': period['end_date'].strftime('%Y-%m-%d %H:%M'),
+                'duration': duration,
+                'progress': 1.0 if period['end_date'] < timezone.now() else 0.5,
+                'parent': str(main_task['id']),
+                'sort_order': subtask_counter,
+                'color': lighten_color(main_task['color'], 0.3),
+                'external_id': f"ticket_{ticket.id}_status_{subtask_counter}",
+                'readonly': True,
+                'source': 'ticket'
+            }
+            subtasks.append(subtask)
+            task_id_counter += 1
+            subtask_counter += 1
+    
+    return subtasks, task_id_counter
 
 
 @login_required
@@ -439,7 +652,9 @@ def gantt_task_update(request, pk):
         return JsonResponse({'action': 'error'})
 
     if request.method == 'DELETE':
+        print(f"Deleting task {task.id}: {task.text}")
         task.delete()
+        print(f"Task {task.id} deleted successfully")
         return JsonResponse({'action': 'deleted'})
 
 
