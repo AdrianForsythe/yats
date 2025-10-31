@@ -7,6 +7,7 @@ import os
 import time
 import tempfile
 import subprocess
+import socket
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -41,11 +42,34 @@ class Command(BaseCommand):
         # Read remote configuration from environment variables
         remote_config = self._get_remote_config()
 
-        monitoring_targets = []
-        if watch_dirs:
-            monitoring_targets.extend([f"local:{d}" for d in watch_dirs])
-        if remote_config:
-            monitoring_targets.append(f"remote:{remote_config['host']}:{remote_config['path']}")
+        # Get current hostname to determine local vs remote watching
+        current_hostname = socket.gethostname()
+
+        # Determine watching mode based on hostname comparison
+        if remote_config and remote_config['host'] == current_hostname:
+            # We're running on the target host - watch locally using the remote path
+            self.stdout.write(
+                self.style.SUCCESS(f'Running on target host ({current_hostname}) - watching locally: {remote_config["path"]}')
+            )
+            actual_watch_dirs = [remote_config['path']]
+            actual_remote_config = None
+            monitoring_targets = [f"local:{remote_config['path']}"]
+        elif remote_config:
+            # We're running on a different host - watch remotely via SSH
+            self.stdout.write(
+                self.style.SUCCESS(f'Running on {current_hostname}, watching remote host {remote_config["host"]}:{remote_config["path"]}')
+            )
+            actual_watch_dirs = []  # Don't watch any local directories
+            actual_remote_config = remote_config
+            monitoring_targets = [f"remote:{remote_config['host']}:{remote_config['path']}"]
+        else:
+            # No remote config - watch local directories as before
+            self.stdout.write(
+                self.style.SUCCESS(f'No remote configuration - watching local directories: {", ".join(watch_dirs)}')
+            )
+            actual_watch_dirs = watch_dirs
+            actual_remote_config = None
+            monitoring_targets = [f"local:{d}" for d in watch_dirs]
 
         self.stdout.write(
             self.style.SUCCESS(f'Starting runfolder watcher monitoring: {", ".join(monitoring_targets)}')
@@ -53,7 +77,7 @@ class Command(BaseCommand):
 
         while True:
             try:
-                self.scan_runfolders(watch_dirs, remote_config)
+                self.scan_runfolders(actual_watch_dirs, actual_remote_config)
                 self.update_ticket_statuses()
 
                 if once:
@@ -368,17 +392,17 @@ class Command(BaseCommand):
 
             # Parse XML files remotely if they exist
             if info['files_present'].get('RunInfo.xml'):
-                xml_info = self._parse_remote_xml_ssh(scp_prefix, runfolder_path, 'RunInfo.xml')
+                xml_info = self._parse_remote_xml_ssh(ssh_prefix, runfolder_path, 'RunInfo.xml')
                 info.update(xml_info)
 
             if info['files_present'].get('RunParameters.xml'):
-                run_params = self._parse_remote_xml_ssh(scp_prefix, runfolder_path, 'RunParameters.xml')
+                run_params = self._parse_remote_xml_ssh(ssh_prefix, runfolder_path, 'RunParameters.xml')
                 if run_params:
                     info['run_start_time'] = run_params.get('run_start_time')
                     info['run_end_time'] = run_params.get('run_end_time')
 
             if info['files_present'].get('RunCompletionStatus.xml'):
-                completion_data = self._parse_remote_xml_ssh(scp_prefix, runfolder_path, 'RunCompletionStatus.xml')
+                completion_data = self._parse_remote_xml_ssh(ssh_prefix, runfolder_path, 'RunCompletionStatus.xml')
                 if completion_data:
                     info['completion_status'] = completion_data.get('completion_status')
                     info['completion_time'] = completion_data.get('completion_time')
@@ -401,29 +425,78 @@ class Command(BaseCommand):
             self.stderr.write(f'Error checking remote file {filename}: {e}')
             return False
 
-    def _parse_remote_xml_ssh(self, scp_prefix: str, runfolder_path: str, filename: str) -> Dict[str, Any]:
-        """Parse XML file from remote server using SCP."""
-        temp_file = None
-        try:
-            # Create a temporary file for the XML content
-            with tempfile.NamedTemporaryFile(mode='w+', suffix='.xml', delete=False) as temp_file:
-                temp_path = temp_file.name
+    def _filter_ssh_login_banner(self, stderr: str) -> str:
+        """Filter out common SSH login banners that aren't actual errors."""
+        # Common login banner patterns that should be ignored
+        banner_patterns = [
+            'Authorized uses only',
+            'All activity may be monitored and reported',
+            'Last login:',
+            'Welcome to',
+            'Unauthorized access is prohibited',
+        ]
 
-            # Copy XML file from remote server using scp
-            scp_cmd = f"{scp_prefix}'{runfolder_path}/{filename}' {temp_path}"
+        lines = stderr.split('\n')
+        filtered_lines = []
+
+        for line in lines:
+            line = line.strip()
+            if line and not any(pattern.lower() in line.lower() for pattern in banner_patterns):
+                filtered_lines.append(line)
+
+        return '\n'.join(filtered_lines)
+
+    def _parse_remote_xml_ssh(self, ssh_prefix: str, runfolder_path: str, filename: str) -> Dict[str, Any]:
+        """Parse XML file from remote server using SSH cat command."""
+        try:
+            # First check if the file exists remotely
+            check_cmd = f"{ssh_prefix} \"test -f '{runfolder_path}/{filename}' && echo EXISTS || echo NOT_EXISTS\""
+            check_result = subprocess.run(
+                check_cmd, shell=True, capture_output=True, text=True, timeout=30
+            )
+
+            if check_result.returncode != 0:
+                # SSH connection failed
+                stderr_clean = self._filter_ssh_login_banner(check_result.stderr.strip())
+                self.stderr.write(f'SSH connection failed for {filename}: {stderr_clean}')
+                if check_result.stdout.strip():
+                    self.stdout.write(f'SSH check stdout: {check_result.stdout.strip()}')
+                return {}
+
+            if 'NOT_EXISTS' in check_result.stdout:
+                # File doesn't exist
+                self.stdout.write(f'Remote XML file {filename} does not exist at {runfolder_path}')
+                return {}
+
+            if 'EXISTS' not in check_result.stdout:
+                # Unexpected response
+                self.stderr.write(f'Unexpected SSH check response for {filename}: stdout="{check_result.stdout.strip()}", stderr="{check_result.stderr.strip()}"')
+                return {}
+
+            # File exists, now try to read it
+            ssh_cmd = f"{ssh_prefix} \"cat '{runfolder_path}/{filename}'\""
             result = subprocess.run(
-                scp_cmd, shell=True, capture_output=True, text=True, timeout=60
+                ssh_cmd, shell=True, capture_output=True, text=True, timeout=60
             )
 
             if result.returncode != 0:
-                self.stderr.write(f'Failed to copy remote XML file {filename}: {result.stderr}')
+                # Filter out common login banners that aren't actual errors
+                stderr_clean = self._filter_ssh_login_banner(result.stderr.strip())
+                if stderr_clean:
+                    self.stderr.write(f'Failed to read remote XML file {filename}: {stderr_clean}')
+                else:
+                    self.stderr.write(f'Failed to read remote XML file {filename} (SSH command failed)')
                 return {}
 
-            # Parse the local copy
+            xml_content = result.stdout.strip()
+            if not xml_content:
+                self.stderr.write(f'Remote XML file {filename} is empty')
+                return {}
+
+            # Parse the XML content directly from string
             try:
                 import xml.etree.ElementTree as ET
-                tree = ET.parse(temp_path)
-                root = tree.getroot()
+                root = ET.fromstring(xml_content)
 
                 # Parse based on filename
                 if filename == 'RunInfo.xml':
@@ -457,18 +530,11 @@ class Command(BaseCommand):
             return {}
 
         except subprocess.TimeoutExpired:
-            self.stderr.write(f'Timeout copying remote XML file {filename}')
+            self.stderr.write(f'Timeout reading remote XML file {filename}')
             return {}
         except Exception as e:
-            self.stderr.write(f'Error parsing remote XML {filename}: {e}')
+            self.stderr.write(f'Error reading remote XML {filename}: {e}')
             return {}
-        finally:
-            # Clean up temp file
-            if temp_file and os.path.exists(temp_path):
-                try:
-                    os.unlink(temp_path)
-                except:
-                    pass
 
     def process_runfolder(self, runfolder_path):
         """Process a single runfolder"""
