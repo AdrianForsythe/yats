@@ -10,7 +10,7 @@ import subprocess
 import socket
 from datetime import datetime
 from typing import Dict, Any, Optional
-
+from dashboard.utils import get_hades_connection
 
 class Command(BaseCommand):
     help = 'Monitor sequencing runfolders and update their status in the database'
@@ -199,11 +199,10 @@ class Command(BaseCommand):
         )
 
     def scan_remote_runfolders(self, remote_config):
-        """Scan runfolders on a remote host using SSH commands"""
+        """Scan runfolders on a remote host for directories associated with open tickets"""
         try:
             ssh_user = remote_config.get('user')
             remote_host = remote_config['host']
-            remote_path = remote_config['path']
             password = remote_config.get('password')
 
             runfolders = []
@@ -232,31 +231,53 @@ class Command(BaseCommand):
                     ssh_prefix = f"ssh {remote_host}"
                     scp_prefix = f"scp {remote_host}:"
 
-            # Use SSH to list directories
-            cmd = f'{ssh_prefix} "find {remote_path} -maxdepth 1 -type d ! -name \'.\'"'
-            result = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=60
-            )
+            # Query database for run directories associated with open tickets
+            conn = get_hades_connection()
+            if not conn:
+                self.stderr.write('Failed to connect to HADES database')
+                return []
 
-            if result.returncode != 0:
-                self.stderr.write(f'SSH command failed for {remote_host}: {result.stderr}')
-                return runfolders
+            try:
+                cursor = conn.cursor()
 
-            # Parse directory listing
-            directories = [
-                line.strip() for line in result.stdout.strip().split("\n")
-                if line.strip() and line.strip() != remote_path
-            ]
+                # Query for RunDirectory from tblD00FlowCells for open tickets
+                # Join with tblD00Requests to get only active/open requests
+                query = """
+                SELECT DISTINCT
+                    fc.RunDirectory
+                FROM [HADES2017].[dbo].[tblD00FlowCells] fc
+                INNER JOIN [HADES2017].[dbo].[tblD00Requests] req
+                    ON fc.FlowCellID = req.FlowCellID
+                WHERE req.StatusID IN (2,3,4,7,10)  -- Active statuses
+                AND fc.RunDirectory IS NOT NULL
+                AND fc.RunDirectory != ''
+                """
 
-            for runfolder_path in directories:
-                runfolder_name = os.path.basename(runfolder_path)
-                runfolder_info = self._get_remote_runfolder_info_ssh(
-                    remote_host, runfolder_path, runfolder_name, ssh_prefix, scp_prefix
-                )
-                if runfolder_info:
-                    runfolders.append(runfolder_info)
+                cursor.execute(query)
+                run_directories = [row[0] for row in cursor.fetchall() if row[0]]
 
-            self.stdout.write(f'Found {len(runfolders)} runfolders on {remote_host}')
+                self.stdout.write(f'Found {len(run_directories)} run directories associated with open tickets')
+
+                # Process each run directory
+                for runfolder_path in run_directories:
+                    if not runfolder_path:
+                        continue
+
+                    runfolder_name = os.path.basename(runfolder_path)
+                    runfolder_info = self._get_remote_runfolder_info_ssh(
+                        remote_host, runfolder_path, runfolder_name, ssh_prefix, scp_prefix
+                    )
+                    if runfolder_info:
+                        runfolders.append(runfolder_info)
+
+                conn.close()
+
+            except Exception as e:
+                self.stderr.write(f'Error querying HADES database: {e}')
+                conn.close()
+                return []
+
+            self.stdout.write(f'Found {len(runfolders)} runfolders to monitor on {remote_host}')
 
             return runfolders
 
