@@ -92,17 +92,19 @@ class Runfolder(models.Model):
 
         # Check for key files
         run_completion_status_path = os.path.join(self.runfolder_path, "RunCompletionStatus.xml")
+        sequence_complete_path = os.path.join(self.runfolder_path, "SequenceComplete.txt")
         copy_complete_path = os.path.join(self.runfolder_path, "CopyComplete.txt")
         rta_complete_path = os.path.join(self.runfolder_path, "RTAComplete.txt")
         run_parameters_path = os.path.join(self.runfolder_path, "RunParameters.xml")
 
         has_run_completion = os.path.exists(run_completion_status_path)
+        has_sequence_complete = os.path.exists(sequence_complete_path)
         has_copy_complete = os.path.exists(copy_complete_path)
         has_rta_complete = os.path.exists(rta_complete_path)
         has_run_parameters = os.path.exists(run_parameters_path)
 
         # Determine status based on file presence
-        if has_run_parameters and has_copy_complete and has_rta_complete and has_run_completion:
+        if has_run_parameters and has_copy_complete and has_rta_complete and (has_run_completion or has_sequence_complete):
             self.status = 'finished'
         elif has_run_parameters and has_copy_complete and has_rta_complete:
             self.status = 'sequencing'
@@ -161,25 +163,42 @@ class Runfolder(models.Model):
             return None
 
     def parse_completion_status(self):
-        """Parse RunCompletionStatus.xml file"""
+        """Parse RunCompletionStatus.xml file or use SequenceComplete.txt"""
         import os
         import xml.etree.ElementTree as ET
+        from datetime import datetime
 
+        # First try RunCompletionStatus.xml
         xml_path = os.path.join(self.runfolder_path, "RunCompletionStatus.xml")
-        if not os.path.exists(xml_path):
-            return None
+        if os.path.exists(xml_path):
+            try:
+                tree = ET.parse(xml_path)
+                root = tree.getroot()
 
-        try:
-            tree = ET.parse(xml_path)
-            root = tree.getroot()
+                completion_status = root.find("CompletionStatus")
+                completion_time = root.find("CompletionTime")
 
-            completion_status = root.find("CompletionStatus")
-            completion_time = root.find("CompletionTime")
+                return {
+                    "completion_status": completion_status.text if completion_status is not None else None,
+                    "completion_time": completion_time.text if completion_time is not None else None
+                }
+            except (ET.ParseError, AttributeError) as e:
+                print(f"Error parsing RunCompletionStatus.xml: {e}")
 
-            return {
-                "completion_status": completion_status.text if completion_status is not None else None,
-                "completion_time": completion_time.text if completion_time is not None else None
-            }
-        except (ET.ParseError, AttributeError) as e:
-            print(f"Error parsing RunCompletionStatus.xml: {e}")
-            return None
+        # If RunCompletionStatus.xml doesn't exist or failed to parse,
+        # try SequenceComplete.txt modification time
+        sequence_complete_path = os.path.join(self.runfolder_path, "SequenceComplete.txt")
+        if os.path.exists(sequence_complete_path):
+            try:
+                # Use file modification time as completion time
+                mtime = os.path.getmtime(sequence_complete_path)
+                completion_datetime = datetime.fromtimestamp(mtime)
+
+                return {
+                    "completion_status": "Completed",
+                    "completion_time": completion_datetime.isoformat()
+                }
+            except Exception as e:
+                print(f"Error getting SequenceComplete.txt modification time: {e}")
+
+        return None

@@ -391,7 +391,8 @@ class Command(BaseCommand):
                 'RunParameters.xml',
                 'RunCompletionStatus.xml',
                 'CopyComplete.txt',
-                'RTAComplete.txt'
+                'RTAComplete.txt',
+                'SequenceComplete.txt'
             ]
 
             for filename in key_files:
@@ -402,7 +403,8 @@ class Command(BaseCommand):
             if (info['files_present'].get('RunParameters.xml') and
                 info['files_present'].get('CopyComplete.txt') and
                 info['files_present'].get('RTAComplete.txt') and
-                info['files_present'].get('RunCompletionStatus.xml')):
+                (info['files_present'].get('RunCompletionStatus.xml') or
+                 info['files_present'].get('SequenceComplete.txt'))):
                 info['status'] = 'finished'
             elif (info['files_present'].get('RunParameters.xml') and
                   info['files_present'].get('CopyComplete.txt') and
@@ -422,11 +424,18 @@ class Command(BaseCommand):
                     info['run_start_time'] = run_params.get('run_start_time')
                     info['run_end_time'] = run_params.get('run_end_time')
 
+            # Get completion time from RunCompletionStatus.xml if available
             if info['files_present'].get('RunCompletionStatus.xml'):
                 completion_data = self._parse_remote_xml_ssh(ssh_prefix, runfolder_path, 'RunCompletionStatus.xml')
                 if completion_data:
                     info['completion_status'] = completion_data.get('completion_status')
                     info['completion_time'] = completion_data.get('completion_time')
+            # Otherwise, use SequenceComplete.txt modification time if available
+            elif info['files_present'].get('SequenceComplete.txt'):
+                completion_time = self._get_remote_file_mtime_ssh(ssh_prefix, runfolder_path, 'SequenceComplete.txt')
+                if completion_time:
+                    info['completion_status'] = 'Completed'
+                    info['completion_time'] = completion_time.isoformat()
 
             return info
 
@@ -445,6 +454,22 @@ class Command(BaseCommand):
         except Exception as e:
             self.stderr.write(f'Error checking remote file {filename}: {e}')
             return False
+
+    def _get_remote_file_mtime_ssh(self, ssh_prefix: str, runfolder_path: str, filename: str) -> Optional[datetime]:
+        """Get the modification time of a remote file using SSH."""
+        try:
+            cmd = f'{ssh_prefix} "stat -c %Y \'{runfolder_path}/{filename}\'"'
+            result = subprocess.run(
+                cmd, shell=True, capture_output=True, text=True, timeout=30
+            )
+            if result.returncode == 0:
+                # stat -c %Y returns seconds since epoch
+                timestamp = int(result.stdout.strip())
+                return datetime.fromtimestamp(timestamp)
+            return None
+        except Exception as e:
+            self.stderr.write(f'Error getting mtime for remote file {filename}: {e}')
+            return None
 
     def _filter_ssh_login_banner(self, stderr: str) -> str:
         """Filter out common SSH login banners that aren't actual errors."""
