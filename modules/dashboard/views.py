@@ -458,7 +458,7 @@ def gantt_data_list(request, offset=0):
             # Create sequencing subtasks for linked runfolders
             sequencing_color = '#9C27B0'  # Purple for sequencing
             for runfolder in ticket.runfolders.all():
-                if runfolder.run_start_time and runfolder.completion_time:
+                if runfolder.run_start_time:
                     # Calculate progress based on runfolder status
                     runfolder_progress = 0.0
                     if runfolder.status == 'finished' or runfolder.status == 'completed':
@@ -470,14 +470,24 @@ def gantt_data_list(request, offset=0):
                     else:
                         runfolder_progress = 0.1
 
+                    # Determine end date: use completion_time if available, otherwise current time
+                    if runfolder.completion_time:
+                        end_date = runfolder.completion_time
+                    else:
+                        # For active runs without completion time, show current time as end
+                        end_date = timezone.now()
+                        # Adjust progress for incomplete runs
+                        if runfolder_progress == 0.7:  # sequencing status
+                            runfolder_progress = 0.5  # halfway through estimated time
+
                     # Calculate duration in days
-                    runfolder_duration = (runfolder.completion_time - runfolder.run_start_time).days + 1
+                    runfolder_duration = (end_date - runfolder.run_start_time).days + 1
 
                     sequencing_subtask = {
                         'id': task_id_counter,
                         'text': f"Sequencing: {runfolder.runfolder_name}",
                         'start_date': runfolder.run_start_time.strftime('%Y-%m-%d %H:%M'),
-                        'end_date': runfolder.completion_time.strftime('%Y-%m-%d %H:%M'),
+                        'end_date': end_date.strftime('%Y-%m-%d %H:%M'),
                         'duration': runfolder_duration,
                         'progress': runfolder_progress,
                         'parent': str(main_task['id']),
