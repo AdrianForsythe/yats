@@ -437,34 +437,34 @@ def gantt_data_list(request, offset=0):
         for ticket in tickets:
             # Determine task color based on type or priority
             color = '#757575'  # Default grey
-            
+
             if ticket.type and ticket.type.name in type_colors:
                 color = type_colors[ticket.type.name]
             elif ticket.priority and ticket.priority.name in priority_colors:
                 color = priority_colors[ticket.priority.name]
-            
+
             # Calculate task dates
             start_date = ticket.c_date
             if ticket.show_start:
                 start_date = ticket.show_start
-            
+
             # For closed tickets, use close_date as end_date
             # For open tickets, use current time as end_date
             if ticket.closed and ticket.close_date:
                 end_date = ticket.close_date
             else:
                 end_date = timezone.now()
-            
+
             # Calculate duration in days
             duration = (end_date - start_date).days + 1  # +1 to include both start and end days
-            
+
             # Calculate progress based on ticket state
             progress = 0.0
             if ticket.closed:
                 progress = 1.0
             elif ticket.state:
                 progress = 0.3  # Default progress for open tickets
-            
+
             # Create main task
             main_task = {
                 'id': task_id_counter,
@@ -482,12 +482,46 @@ def gantt_data_list(request, offset=0):
             }
             tasks.append(main_task)
             task_id_counter += 1
-            
-            # Create subtasks only for current status (no static metadata)
-            # TODO: In the future, this should be replaced with historical status changes
-            # from the tickets_history table to show time spent in each status
+
+            # Create subtasks
             subtask_counter = 1
-            
+
+            # Create sequencing subtasks for linked runfolders
+            sequencing_color = '#9C27B0'  # Purple for sequencing
+            for runfolder in ticket.runfolders.all():
+                if runfolder.run_start_time and runfolder.completion_time:
+                    # Calculate progress based on runfolder status
+                    runfolder_progress = 0.0
+                    if runfolder.status == 'finished' or runfolder.status == 'completed':
+                        runfolder_progress = 1.0
+                    elif runfolder.status == 'sequencing':
+                        runfolder_progress = 0.7
+                    elif runfolder.status == 'copying':
+                        runfolder_progress = 0.3
+                    else:
+                        runfolder_progress = 0.1
+
+                    # Calculate duration in days
+                    runfolder_duration = (runfolder.completion_time - runfolder.run_start_time).days + 1
+
+                    sequencing_subtask = {
+                        'id': task_id_counter,
+                        'text': f"Sequencing: {runfolder.runfolder_name}",
+                        'start_date': runfolder.run_start_time.strftime('%Y-%m-%d %H:%M'),
+                        'end_date': runfolder.completion_time.strftime('%Y-%m-%d %H:%M'),
+                        'duration': runfolder_duration,
+                        'progress': runfolder_progress,
+                        'parent': str(main_task['id']),
+                        'sort_order': subtask_counter,
+                        'color': sequencing_color,
+                        'external_id': f"ticket_{ticket.id}_sequencing_{runfolder.id}",
+                        'readonly': True,
+                        'source': 'sequencing'
+                    }
+                    tasks.append(sequencing_subtask)
+                    task_id_counter += 1
+                    subtask_counter += 1
+
             # Only create a subtask for the current status if it's meaningful
             if ticket.state and ticket.state.name not in ['', 'New', 'Open', 'Default Flow']:
                 subtask = {
